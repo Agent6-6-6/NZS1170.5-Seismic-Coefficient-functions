@@ -2,6 +2,87 @@ Attribute VB_Name = "NZS1170_Seismic_Coefficient"
 'Refer https://engineervsheep.com/2020/seismic-coefficient-1/ for further notes on usage
 '____________________________________________________________________________________________________________
 Option Explicit
+
+Function Loading_ADRS(T_1 As Variant, Site_subsoil_class As String, Hazard_factor As Double, Return_period_factor As Double, _
+                      Fault_distance As Variant, S_p As Double, zeta_sys As Double, _
+                      Optional D_subsoil_interpolate As Boolean = False, Optional T_site As Double = 1.5) As Variant
+'function to calculate the spectral displacement and spectral acceleration for plotting an ADRS Curve (Acceleration Displacement Response Spectrum)
+
+'________________________________________________________________________________________________________________
+'USAGE
+'________________________________________________________________________________________________________________
+'=Loading_ADRS(T_1,Site_subsoil_class,Hazard_factor,Return_period_factor,Fault_distance,S_p,zeta_sys,D_subsoil_interpolate,T_site)
+'T_1 = FIRST MODE PERIOD
+'Site_subsoil_class = SITE SUBSOIL CLASS, i.e. A/B/C/D/E (ENTERED AS A STRING)
+'Hazard_factor = HAZARD FACTOR Z
+'Return_period_factor = RETURN PERIOD FACTOR Ru OR Rs
+'Fault_distance = THE SHORTEST DISTANCE (IN kM's) FROM THE SITE TO THE NEAREST FAULT LISTED IN TABLE 3.6 OF NZS1170.5
+'                 IF NOT RELEVANT USE "N/A" OR A NUMBER >= 20
+'S_p = STRUCTURAL PERFORMANCE FACTOR
+'zeta_sys = SYSTEM DAMPING (AS A PERCENTAGE)
+'OPTIONAL - D_subsoil_interpolation is optional - TRUE/FALSE - consider interpolation for class D soils
+'OPTIONAL - T_site is optional - Site period when required for considering interpolation for class D soils
+'           (note default value of 1.5 seconds equates to no interpolation)
+'________________________________________________________________________________________________________________
+
+    Dim results As Variant
+    Dim C_d_T As Variant
+    Dim K_zeta As Double
+    Dim i
+
+    'determine the spectral damping reduction factor
+    K_zeta = Loading_K_zeta(zeta_sys)
+
+    'determine the 5% damping Response Spectrum design spectrum with ductility of 1.0 (so k_mu = 1.0)
+    C_d_T = Loading_C_d_T(T_1, Site_subsoil_class, Hazard_factor, Return_period_factor, Fault_distance, 1, S_p, False, D_subsoil_interpolate, T_site)
+
+    ReDim results(LBound(T_1) To UBound(T_1), 1 To 2)
+
+    For i = LBound(T_1) To UBound(T_1)
+
+        'determine the spectral acceleration (S_a)
+        results(i, 2) = K_zeta * C_d_T(i, 1)
+        'determine the spectral displacement (S_d)
+        results(i, 1) = Loading_K_delta_T(T_1(i, 1)) * results(i, 2)
+
+    Next i
+
+    'return results
+    Loading_ADRS = results
+
+End Function
+
+Function Loading_K_delta_T(T_1 As Variant) As Variant
+'function to calculate the Displacement spectral scaling factor
+
+'________________________________________________________________________________________________________________
+'USAGE
+'________________________________________________________________________________________________________________
+'=Loading_K_delta_T(T_1)
+'T_1 = FIRST MODE PERIOD
+'________________________________________________________________________________________________________________
+
+    Dim pi As Double
+    pi = 3.14159265358979
+
+    Loading_K_delta_T = 9810 * T_1 ^ 2 / (4 * pi ^ 2)
+
+End Function
+
+Function Loading_K_zeta(zeta_sys As Double)
+'function to calculate the spectral damping reduction factor
+
+'________________________________________________________________________________________________________________
+'USAGE
+'________________________________________________________________________________________________________________
+'=Loading_K_zeta(zeta_sys)
+'zeta_sys = SYSTEM DAMPING (AS A PERCENTAGE)
+'________________________________________________________________________________________________________________
+
+    Loading_K_zeta = (7 / (2 + zeta_sys)) ^ 0.5
+
+End Function
+
 Function Loading_C_h_T(T_1 As Double, Site_subsoil_class As String, Optional ESM_case As Boolean = True, _
                        Optional D_subsoil_interpolate As Boolean = False, Optional T_site As Double = 1.5)
 'Function to calculate the spectral shape factor (Ch(T)) based on site subsoil soil class (A/B/C/D/E) type
@@ -315,6 +396,25 @@ Function Loading_C_d_T(T_1 As Variant, Site_subsoil_class As String, Hazard_fact
                        Optional D_subsoil_interpolate As Boolean = False, Optional T_site As Double = 1.5) As Variant
 'Function to calculate C_d(T), the seismic load coefficient for a single period T, or series of T periods arranged in a column range
 
+'________________________________________________________________________________________________________________
+'USAGE
+'________________________________________________________________________________________________________________
+'=Loading_C_d_T(T_1,Site_subsoil_class,Hazard_factor,Return_period_factor,Fault_distance,mu,S_p,ESM_case,D_subsoil_interpolate,T_site)
+'T_1 = FIRST MODE PERIOD
+'Site_subsoil_class = SITE SUBSOIL CLASS, i.e. A/B/C/D/E (ENTERED AS A STRING)
+'Hazard_factor = HAZARD FACTOR Z
+'Return_period_factor = RETURN PERIOD FACTOR Ru OR Rs
+'Fault_distance = THE SHORTEST DISTANCE (IN kM's) FROM THE SITE TO THE NEAREST FAULT LISTED IN TABLE 3.6 OF NZS1170.5
+'                 IF NOT RELEVANT USE "N/A" OR A NUMBER >= 20
+'mu = DUCTILITY
+'S_p = STRUCTURAL PERFORMANCE FACTOR
+'OPTIONAL - ESM_case is optional (ESM = Equivalent Static Method), when set to false the Response Spectrum Method (RSM)
+'           shape factor will be calculated.
+'OPTIONAL - D_subsoil_interpolation is optional - TRUE/FALSE - consider interpolation for class D soils
+'OPTIONAL - T_site is optional - Site period when required for considering interpolation for class D soils
+'           (note default value of 1.5 seconds equates to no interpolation)
+'________________________________________________________________________________________________________________
+
     Dim arr_temp As Double
     Dim k As Integer
 
@@ -346,12 +446,12 @@ End Function
 Private Function Loading_C_d_T_intermediate(T_1 As Double, Site_subsoil_class As String, Hazard_factor As Double, Return_period_factor As Double, _
                                             Fault_distance As Variant, mu As Double, S_p As Double, Optional ESM_case As Boolean = True, _
                                             Optional D_subsoil_interpolate As Boolean = False, Optional T_site As Double = 1.5)
-'Function to calculate C_d(T), the seismic load coefficient
+'Function to calculate C_d(T), the seismic load coefficient for a single period T
 
 '________________________________________________________________________________________________________________
 'USAGE
 '________________________________________________________________________________________________________________
-'=Loading_C_d_T(T_1,Site_subsoil_class,Hazard_factor,Return_period_factor,Fault_distance,mu,S_p,ESM_case,D_subsoil_interpolate,T_site)
+'=Loading_C_d_T_intermediate(T_1,Site_subsoil_class,Hazard_factor,Return_period_factor,Fault_distance,mu,S_p,ESM_case,D_subsoil_interpolate,T_site)
 'T_1 = FIRST MODE PERIOD
 'Site_subsoil_class = SITE SUBSOIL CLASS, i.e. A/B/C/D/E (ENTERED AS A STRING)
 'Hazard_factor = HAZARD FACTOR Z
@@ -439,7 +539,6 @@ Function Loading_generate_period_range(period_range_limit As Double, period_step
 '   2
 'NOTE - there will be some duplicates as shown above, but this does not impact on plotting spectrum based on
 'resulting period range
-
 '________________________________________________________________________________________________________________
 
     Dim T_1_arr
