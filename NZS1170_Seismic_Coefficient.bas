@@ -498,14 +498,12 @@ Private Function Loading_C_d_T_intermediate(T_1 As Double, Site_subsoil_class As
     'Horizontal design action coefficient
     C_d_T = C_T * S_p / k_mu
 
-    'Check for minimum level design coefficient for ULS cases, i.e. when R > 0.25
-    If Return_period_factor > 0.25 Then
-        If C_d_T < Z_R_product / 20 + 0.02 * Return_period_factor Then
-            C_d_T = Z_R_product / 20 + 0.02 * Return_period_factor
-        End If
-        If C_d_T < 0.03 * Return_period_factor Then
-            C_d_T = 0.03 * Return_period_factor
-        End If
+    'Check for minimum level design coefficient for ULS/SLS cases
+    If C_d_T < Z_R_product / 20 + 0.02 * Return_period_factor Then
+        C_d_T = Z_R_product / 20 + 0.02 * Return_period_factor
+    End If
+    If C_d_T < 0.03 * Return_period_factor Then
+        C_d_T = 0.03 * Return_period_factor
     End If
 
     'return results
