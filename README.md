@@ -7,3 +7,5 @@ https://engineervsheep.com/2020/seismic-coefficient-1/
 ### Change log
 
 2020-11-22 - Added functions to generate ADRS curves, tidied up Loading_C_d_T documentation.
+
+2020-11-22 - Update Loading_C_h_T calc to cap some results to maximum & Update Loading_generate_period_range calc to add point of interest between intepolation of C & D soils

@@ -130,6 +130,9 @@ Function Loading_C_h_T(T_1 As Double, Site_subsoil_class As String, Optional ESM
                 If T_1 > 1.5 And T_1 <= 3 Then Loading_C_h_T = 1.32 / T_1
                 If T_1 > 3 Then Loading_C_h_T = 3.96 / T_1 ^ 2
 
+                'additional check because at just above T=0.4 the value spikes above 2.36, this smooths out this blip
+                If Loading_C_h_T > 2.36 Then Loading_C_h_T = 2.36
+
             Case "D"
 
                 'check if interpolation can be adopted
@@ -195,6 +198,9 @@ Function Loading_C_h_T(T_1 As Double, Site_subsoil_class As String, Optional ESM
                 If T_1 > 1.5 And T_1 <= 3 Then Loading_C_h_T = 1.32 / T_1
                 If T_1 > 3 Then Loading_C_h_T = 3.96 / T_1 ^ 2
 
+                'additional check because at just above T=0.3 the value spikes above 2.93, this smooths out this blip
+                If Loading_C_h_T > 2.93 Then Loading_C_h_T = 2.93
+
             Case "D"
 
                 'check if interpolation can be adopted
@@ -206,6 +212,9 @@ Function Loading_C_h_T(T_1 As Double, Site_subsoil_class As String, Optional ESM
                     If T_1 >= 0.3 And T_1 <= 1.5 Then C_h_T_shallow = 2 * (0.5 / T_1) ^ 0.75
                     If T_1 > 1.5 And T_1 <= 3 Then C_h_T_shallow = 1.32 / T_1
                     If T_1 > 3 Then C_h_T_shallow = 3.96 / T_1 ^ 2
+
+                    'additional check because at just above T=0.3 the value spikes above 2.93, this smooths out this blip
+                    If C_h_T_shallow > 2.93 Then C_h_T_shallow = 2.93
 
                     Loading_C_h_T = C_h_T_shallow * (1 + 0.5 * (T_site - 0.25))
                     If Loading_C_h_T > 3 Then Loading_C_h_T = 3
@@ -504,7 +513,7 @@ Private Function Loading_C_d_T_intermediate(T_1 As Double, Site_subsoil_class As
 
 End Function
 
-Function Loading_generate_period_range(period_range_limit As Double, period_step As Double)
+Function Loading_generate_period_range(period_range_limit As Double, period_step As Double, Optional T_site As Double = 1.5)
 'Function to return array of period values at all points of interest for calculating values at all transition points
 'and a distributed time step at 'period_step' intervals
 '________________________________________________________________________________________________________________
@@ -548,13 +557,14 @@ Function Loading_generate_period_range(period_range_limit As Double, period_step
     Dim steps
 
     num_steps = period_range_limit / period_step + 1
-    num_points_of_interest = 11
+    num_points_of_interest = 12
 
     'resize results array for all regular intervals and points of interest
     ReDim steps(1 To num_steps + num_points_of_interest - 1)
 
     'create array of 'points of interest' where transitions or abrupt steps of various factors occurs
-    T_1_arr = Array(0, 0.1 - 0.00000000001, 0.1, 0.3, 0.4, 0.56, 1, 1.5, 3, 4, 5)
+    T_1_arr = Array(0, 0.1 - 0.00000000001, 0.1, 0.3, 0.4, 0.56, 1, 1.5, 3, 4, 5, _
+                    1 / (((3 / (1 + 0.5 * (T_site - 0.25))) / 2) ^ (1 / 0.75)) * 0.5)
 
     'populate regular period intervals starting at zero and max of 'period_range_limit'
     steps(1) = 0
