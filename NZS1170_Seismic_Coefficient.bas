@@ -583,9 +583,77 @@ Function Loading_generate_period_range(period_range_limit As Double, period_step
     'transpose array to single column of results
     steps = WorksheetFunction.Transpose(steps)
     'sort results into numerical order
+    On Error GoTo skip_code
+    'for excel 365
     steps = WorksheetFunction.Sort(steps)
-
+    GoTo return_results
+skip_code: 'for excel 2019
+    steps = NZS1170_Seismic_Coefficient.array_quicksort_2D(steps)
+    
+return_results:
     'return results
     Loading_generate_period_range = steps
 
 End Function
+
+Function array_quicksort_2D(arr As Variant, Optional sort_column As Long = -1) As Variant
+'Function that sorts a two-dimensional VBA array from smallest to largest using a divide and conquer algorithm
+'sorting is undertaken based on the column specified, if no column is specified the lower bound column is used
+
+    Dim lower_bound As Long
+    Dim upper_bound As Long
+
+    lower_bound = LBound(arr, 1)
+    upper_bound = UBound(arr, 1)
+
+    Call array_quicksort_2D_sub(arr, lower_bound, upper_bound, sort_column)
+
+    'Return results
+    array_quicksort_2D = arr
+
+End Function
+
+Private Sub array_quicksort_2D_sub(ByRef arr As Variant, lower_bound As Long, upper_bound As Long, Optional sort_column As Long = -1)
+'Sub-procedure that sorts a two-dimensional VBA array from smallest to largest using a divide and conquer algorithm
+'sorting is undertaken based on the column specified, if no column is specified the lower bound column is used
+
+'called from array_quicksort_2D function, but can be used independantly of this incompassing function
+
+    Dim temp_low As Long
+    Dim temp_high As Long
+    Dim pivot_value As Variant
+    Dim temp_arr_row As Variant
+    Dim temp_sort_column As Long
+
+    If sort_column = -1 Then sort_column = LBound(arr, 2)
+    temp_low = lower_bound
+    temp_high = upper_bound
+    pivot_value = arr((lower_bound + upper_bound) \ 2, sort_column)
+
+    'Divide data in array
+    While temp_low <= temp_high
+        While arr(temp_low, sort_column) < pivot_value And temp_low < upper_bound
+            temp_low = temp_low + 1
+        Wend
+        While pivot_value < arr(temp_high, sort_column) And temp_high > lower_bound
+            temp_high = temp_high - 1
+        Wend
+
+        If temp_low <= temp_high Then    'swap rows if required
+            ReDim temp_arr_row(LBound(arr, 2) To UBound(arr, 2))
+            For temp_sort_column = LBound(arr, 2) To UBound(arr, 2)
+                temp_arr_row(temp_sort_column) = arr(temp_low, temp_sort_column)
+                arr(temp_low, temp_sort_column) = arr(temp_high, temp_sort_column)
+                arr(temp_high, temp_sort_column) = temp_arr_row(temp_sort_column)
+            Next temp_sort_column
+            Erase temp_arr_row
+            temp_low = temp_low + 1
+            temp_high = temp_high - 1
+        End If
+    Wend
+
+    'Sort data in array in iterative process
+    If (lower_bound < temp_high) Then Call array_quicksort_2D_sub(arr, lower_bound, temp_high, sort_column)
+    If (temp_low < upper_bound) Then Call array_quicksort_2D_sub(arr, temp_low, upper_bound, sort_column)
+
+End Sub
