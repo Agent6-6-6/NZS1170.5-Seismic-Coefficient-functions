@@ -12,4 +12,6 @@ https://engineervsheep.com/2020/seismic-coefficient-1/
 
 2020-11-22 - Update to ensure lower limit coefficients apply to SLS1 & SLS2 cases, to maintain same relationship between ULS & SLS when limits are applied
 
-2021-08-08 - Update to add alternative means of sorting period array to add compatibility with Excel 2019 whihc does not have the SORT worksheet function
+2021-09-08 - Update to add alternative means of sorting period array to add compatibility with Excel 2019 which does not have the SORT worksheet function
+
+2021-09-11 - Add NZS1170.5 parts coefficient functions to calculate the parts and components coefficient in accordance with NZ1170.5 Chapter 8

@@ -589,7 +589,7 @@ Function Loading_generate_period_range(period_range_limit As Double, period_step
     GoTo return_results
 skip_code: 'for excel 2019
     steps = NZS1170_Seismic_Coefficient.array_quicksort_2D(steps)
-    
+
 return_results:
     'return results
     Loading_generate_period_range = steps
@@ -657,3 +657,258 @@ Private Sub array_quicksort_2D_sub(ByRef arr As Variant, lower_bound As Long, up
     If (temp_low < upper_bound) Then Call array_quicksort_2D_sub(arr, temp_low, upper_bound, sort_column)
 
 End Sub
+
+Function Loading_C_d_T_part(T_part As Variant, Site_subsoil_class As String, Hazard_factor As Double, Return_period_factor As Double, _
+                            R_p As Double, mu_part As Double, h_i As Double, h_n As Double, Optional C_ph_code_values As Boolean = True) As Variant
+'Function to calculate the parts and components seismic coefficient
+
+'________________________________________________________________________________________________________________
+'USAGE
+'________________________________________________________________________________________________________________
+'=Loading_C_d_T_intermediate_part(T_part,Site_subsoil_class,Hazard_factor,Return_period_factor,Fault_distance,R_p,mu_part,h_i,h_n,C_ph_code_values)
+'T_part = PART FIRST MODE PERIOD
+'Site_subsoil_class = SITE SUBSOIL CLASS, i.e. A/B/C/D/E (ENTERED AS A STRING)
+'Hazard_factor = HAZARD FACTOR Z
+'Return_period_factor = RETURN PERIOD FACTOR Ru OR Rs
+'mu_part = DUCTILITY OF PART
+'h_i = HEIGHT OF ATTACHMENT OF PART
+'h_n = HEIGHT FROM THE BASE OF THE STRUCTURE TO THE UPPERMOST SEISMIC WEIGHT OR MASS
+'OPTIONAL - C_ph_code_values is optional, when set to TRUE the value is interpolated from the NZS1170.5 TABLE C8.3
+'           rounded values. When set to FALSE, the values are calculated based on first principles approach
+'________________________________________________________________________________________________________________
+
+    Dim arr_temp As Double
+    Dim k As Integer
+
+    'convert to array
+    'check if single value provided (i.e. one cell), and convert to 2D array
+    If T_part.Rows.count = 1 Then
+        T_part = Array(T_part.Value2)
+        arr_temp = T_part(0)
+        ReDim T_part(1 To 1, 1 To 1)
+        T_part(1, 1) = arr_temp
+    Else
+        'convert to 2D array
+        T_part = T_part.Value2
+    End If
+
+    Dim C_d_T_part
+    ReDim C_d_T_part(LBound(T_part) To UBound(T_part), 1 To 1)
+
+    For k = LBound(T_part) To UBound(T_part)
+        C_d_T_part(k, 1) = Loading_C_d_T_intermediate_part(T_part(k, 1), Site_subsoil_class, Hazard_factor, Return_period_factor, _
+                                                           R_p, mu_part, h_i, h_n, C_ph_code_values)
+    Next k
+
+    'return results
+    Loading_C_d_T_part = C_d_T_part
+
+End Function
+
+Private Function Loading_C_d_T_intermediate_part(T_part As Variant, Site_subsoil_class As String, Hazard_factor As Double, Return_period_factor As Double, _
+                                                 R_p As Double, mu_part As Double, h_i As Double, h_n As Double, Optional C_ph_code_values As Boolean = True)
+'Function to calculate C_d(T) for parts and components loading, the parts seismic load coefficient for a single period T
+
+'________________________________________________________________________________________________________________
+'USAGE
+'________________________________________________________________________________________________________________
+'=Loading_C_d_T_intermediate_part(T_part,Site_subsoil_class,Hazard_factor,Return_period_factor,Fault_distance,R_p,mu_part,h_i,h_n,C_ph_code_values)
+'T_part = PART FIRST MODE PERIOD
+'Site_subsoil_class = SITE SUBSOIL CLASS, i.e. A/B/C/D/E (ENTERED AS A STRING)
+'Hazard_factor = HAZARD FACTOR Z
+'Return_period_factor = RETURN PERIOD FACTOR Ru OR Rs
+'mu_part = DUCTILITY OF PART
+'h_i = HEIGHT OF ATTACHMENT OF PART
+'h_n = HEIGHT FROM THE BASE OF THE STRUCTURE TO THE UPPERMOST SEISMIC WEIGHT OR MASS
+'OPTIONAL - C_ph_code_values is optional, when set to TRUE the value is interpolated from the NZS1170.5 TABLE C8.3
+'           rounded values. When set to FALSE, the values are calculated based on first principles approach
+'________________________________________________________________________________________________________________
+
+    Dim C_T0_part
+    Dim C_Hi_part
+    Dim C_i_T_part
+    Dim C_ph_part
+    Dim C_d_T_part
+    Dim Z_R_product
+
+    'check if Z x R > 0.7, if so limit product to 0.7 for calculating C_T
+    If Hazard_factor * Return_period_factor > 0.7 Then
+        Z_R_product = 0.7
+    Else
+        Z_R_product = Hazard_factor * Return_period_factor
+    End If
+
+    'Elastic site spectra for T=0 seconds for modal response spectrum method
+    C_T0_part = Loading_C_T(0, Site_subsoil_class, Hazard_factor, Return_period_factor, "N/A", False)
+
+    'Determine floor height coefficient
+    C_Hi_part = Loading_C_Hi(h_i, h_n)
+
+    'determine part or component spectral shape coefficient
+    C_i_T_part = Loading_C_i_T_p(T_part)
+
+    'determine part horizontal response factor from first principles calculation, this will result in slightly different values as
+    'the results are not rounded like the code values (refer commentary for tabulated values)
+    C_ph_part = Loading_C_ph_part(mu_part, C_ph_code_values)
+
+    'Horizontal design action coefficient
+    C_d_T_part = C_T0_part * C_Hi_part * C_i_T_part * C_ph_part * R_p
+
+    'Check for maximum level design coefficient of 3.6
+    If C_d_T_part > 3.6 Then C_d_T_part = 3.6
+
+    'return results
+    Loading_C_d_T_intermediate_part = C_d_T_part
+
+End Function
+
+Function Loading_C_ph_part(mu_part As Double, Optional C_ph_code_values As Boolean = True)
+'Function to return the part response factor, calculated from first priciples based on the TABLE C8.3 in the commentary of NZS1170.5
+'or from TABLE C8.3 values
+
+'refer following Loading_k_mu_part and Loading_Sp_1170 for basis of the first principles calculation
+
+'________________________________________________________________________________________________________________
+'USAGE
+'________________________________________________________________________________________________________________
+'=Loading_C_ph_part(mu_part,C_ph_code_values)
+'mu_part = DUCTILITY OF PART
+'OPTIONAL - C_ph_code_values is optional, when set to TRUE the value is interpolated from the NZS1170.5 TABLE C8.3
+'           rounded values. When set to FALSE, the values are calculated based on first principles approach
+'________________________________________________________________________________________________________________
+
+    Dim mu_part_array
+    Dim C_p_round_array
+    Dim lower_bound_index As Long
+    Dim upper_bound_index As Long
+    Dim i As Long
+
+    If C_ph_code_values Then
+        'determine part horizontal response factor from code rounded values in TABLE C8.3
+        mu_part_array = Array(1, 1.25, 1.5, 1.75, 2, 3, 6)
+        C_p_round_array = Array(1, 0.85, 0.75, 0.65, 0.55, 0.45, 0.45)
+        'interpolate for C_ph value
+        'determine upper bound index
+        For i = LBound(mu_part_array) To UBound(mu_part_array)
+            'determine in what band the actual ductility lies
+            If mu_part <= mu_part_array(i) Then
+                upper_bound_index = i
+                GoTo skip_code1
+            End If
+        Next i
+skip_code1:
+        'determine lower bound index
+        For i = UBound(mu_part_array) To LBound(mu_part_array) Step -1
+            'determine in what band the actual ductility lies
+            If mu_part >= mu_part_array(i) Then
+                lower_bound_index = i
+                GoTo skip_code2
+            End If
+        Next i
+skip_code2:
+
+        'interpolate for code C_ph value based on mu_part
+        If lower_bound_index = upper_bound_index Then
+            Loading_C_ph_part = C_p_round_array(lower_bound_index)
+        Else
+            Loading_C_ph_part = C_p_round_array(lower_bound_index) * _
+                                (1 - (mu_part - mu_part_array(lower_bound_index)) / (mu_part_array(upper_bound_index) - mu_part_array(lower_bound_index))) + _
+                                C_p_round_array(upper_bound_index) * _
+                                ((mu_part - mu_part_array(lower_bound_index)) / (mu_part_array(upper_bound_index) - mu_part_array(lower_bound_index)))
+        End If
+
+    Else
+        'determin part horizontal response factor from first principles
+        Loading_C_ph_part = Loading_S_p_1170(mu_part) / Loading_k_mu_part(mu_part)
+    End If
+
+End Function
+
+Function Loading_C_Hi(h_i As Double, h_n As Double)
+'Function to calculate C_Hi the floor height coefficient for parts & components loading
+
+'________________________________________________________________________________________________________________
+'USAGE
+'________________________________________________________________________________________________________________
+'=Loading_C_Hi(h_i,h_n)
+'h_i = HEIGHT OF ATTACHMENT OF PART
+'h_n = HEIGHT FROM THE BASE OF THE STRUCTURE TO THE UPPERMOST SEISMIC WEIGHT OR MASS
+'________________________________________________________________________________________________________________
+
+    Dim C_Hi1 As Double
+    Dim C_Hi2 As Double
+    Dim C_Hi3 As Double
+
+    C_Hi1 = 1 + h_i / 6
+    C_Hi2 = 1 + 10 * (h_i / h_n)
+    C_Hi3 = 3
+
+    If h_i < 12 Or h_i < 0.2 * h_n Then
+        Loading_C_Hi = WorksheetFunction.Min(C_Hi1, C_Hi2)
+    ElseIf h_i < 0.2 * h_n Then
+        Loading_C_Hi = C_Hi2
+    Else
+        Loading_C_Hi = C_Hi3
+    End If
+
+End Function
+
+Function Loading_C_i_T_p(T_part As Variant)
+'Function to calculate Ci(Tp) the part spectral shape coefficient for parts & components loading
+
+'________________________________________________________________________________________________________________
+'USAGE
+'________________________________________________________________________________________________________________
+'=Loading_C_i_T_p(T_part)
+'T_part = PART FIRST MODE PERIOD
+'________________________________________________________________________________________________________________
+
+    If T_part <= 0.75 Then
+        Loading_C_i_T_p = 2
+    ElseIf T_part >= 1.5 Then
+        Loading_C_i_T_p = 0.5
+    Else
+        Loading_C_i_T_p = 2 * (1.75 - T_part)
+    End If
+
+End Function
+
+Function Loading_k_mu_part(mu_part As Double)
+'Function to return the k_mu factor appropriate for parts, determined from values in TABLE C8.3 in NZS1170.5 commentary.
+
+'________________________________________________________________________________________________________________
+'USAGE
+'________________________________________________________________________________________________________________
+'=Loading_k_mu_part(mu_part)
+'mu_part = DUCTILITY OF PART
+
+'NOTE - the calculated values in TABLE C8.3 are consistent with the calculation at T = 0 seconds,
+'       using any soil classification except "E" and the following relationship
+'       k_mu_part = (k_mu - 1) / 2 + 1
+'       This will result in the values in TABLE C8.3 being actually calculated without any rounding
+'________________________________________________________________________________________________________________
+
+    Dim Site_subsoil_class As String
+
+    Site_subsoil_class = "A"    'could use any value here apart from "E"
+
+    Loading_k_mu_part = (Loading_k_mu(0, Site_subsoil_class, mu_part) - 1) / 2 + 1
+
+End Function
+
+Function Loading_S_p_1170(mu As Double)
+'Function to return an Sp factor in accordance with NZS1170.5 CL4.4.2
+
+'________________________________________________________________________________________________________________
+'USAGE
+'________________________________________________________________________________________________________________
+'=Loading_S_p_1170(mu_part)
+'mu = DUCTILITY
+'________________________________________________________________________________________________________________
+
+    Loading_S_p_1170 = 1.3 - 0.3 * mu
+
+    'check lower limit if S_p < 0.7
+    If Loading_S_p_1170 < 0.7 Then Loading_S_p_1170 = 0.7
+
+End Function
