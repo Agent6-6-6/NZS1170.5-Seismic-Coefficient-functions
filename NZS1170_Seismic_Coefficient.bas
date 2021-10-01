@@ -665,7 +665,7 @@ Function Loading_C_d_T_part(T_part As Variant, Site_subsoil_class As String, Haz
 '________________________________________________________________________________________________________________
 'USAGE
 '________________________________________________________________________________________________________________
-'=Loading_C_d_T_intermediate_part(T_part,Site_subsoil_class,Hazard_factor,Return_period_factor,Fault_distance,R_p,mu_part,h_i,h_n,C_ph_code_values)
+'=Loading_C_d_T_intermediate_part(T_part,Site_subsoil_class,Hazard_factor,Return_period_factor,R_p,mu_part,h_i,h_n,C_ph_code_values)
 'T_part = PART FIRST MODE PERIOD
 'Site_subsoil_class = SITE SUBSOIL CLASS, i.e. A/B/C/D/E (ENTERED AS A STRING)
 'Hazard_factor = HAZARD FACTOR Z
@@ -712,7 +712,7 @@ Private Function Loading_C_d_T_intermediate_part(T_part As Variant, Site_subsoil
 '________________________________________________________________________________________________________________
 'USAGE
 '________________________________________________________________________________________________________________
-'=Loading_C_d_T_intermediate_part(T_part,Site_subsoil_class,Hazard_factor,Return_period_factor,Fault_distance,R_p,mu_part,h_i,h_n,C_ph_code_values)
+'=Loading_C_d_T_intermediate_part(T_part,Site_subsoil_class,Hazard_factor,Return_period_factor,R_p,mu_part,h_i,h_n,C_ph_code_values)
 'T_part = PART FIRST MODE PERIOD
 'Site_subsoil_class = SITE SUBSOIL CLASS, i.e. A/B/C/D/E (ENTERED AS A STRING)
 'Hazard_factor = HAZARD FACTOR Z
